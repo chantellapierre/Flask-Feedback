@@ -16,7 +16,7 @@ toolbar = DebugToolbarExtension(app)
 
 @app.route('/')
 def home_page():
-    return render_template('index.html')
+    return redirect("/register")
 
 
 ###User routes
@@ -29,7 +29,7 @@ def show_user_details(username):
         user = User.query.get(username)
         form = DeleteForm
         return redirect('/login')
-    return render_template('details.html', user=user, form=form)
+    return render_template('users/show.html', user=user, form=form)
 
 @app.route('/register', methods = ['GET', 'POST'])
 def register_user():
@@ -84,50 +84,89 @@ def logout_user():
     return redirect('/login')
 
 @app.route('/users/<username>/delete')
-def delete_user():
-    return render_template('/')
+def delete_user(username):
+    
+    if "username" not in session or username != session['username']:
+        raise Unauthorized()
+
+    user = User.query.get(username)
+    db.session.delete(user)
+    db.session.commit()
+    session.pop("username")
+
+    return render_template('/login')
 
 ###Feedback routes
 
-@app.route('/users/<username>/feedback/add', methods = ['GET', 'POST'])
+@app.route('/users/<username>/feedback/new', methods = ['GET', 'POST'])
 def add_feedback():
-    if "user_id" not in session:
+    
+    if "username" not in session:
         flash("Please log in first!", "danger")
+        raise Unauthorized()
         return redirect('/login')
+
     form = FeedbackForm()
+
     feedback = Feedback.query.all()
+
     if form.validate_on_submit():
-        text = form.text.data
-        new_feedback = Feedback(text=text, user_id = session["user_id"])
+        title = form.title.data
+        content = form.content.data
 
-        db.session.add(new_feedback)
+        feedback = Feedback(
+        title=title,
+        content=content,
+        username=username,
+        )
+
+        db.session.add(feedback)
         db.session.commit()
+
         flash("Feedback created!", "success")
-        redirect('/feedback')
-    return render_template('feedback.html', form=form, Feedback=feedback)
+        return redirect(f'/users/{feedback.username')
 
-@app.route('/feedback/<int:id>/update', methods = ['GET'])
-def update_feedback_form():
+    else:
+        return render_template('feedback.html', form=form)
+
+
+@app.route('/feedback/<int:feedback_id>/update', methods = ['GET', 'POST'])
+def update_feedback(feedback_id):
+    
+    feedback = Feedback.query.get(feedback_id)
     form = FeedbackForm()
-    return render_template('feedback.html', form=form)
 
-@app.route('/feedback/<int:id>/update', methods = ['POST'])
-def post_update_feedback():
-    return render_template('feedback.html')
+    if 'username' not in session:
+        raise Unauthorized()
 
-@app.route('/feedback/<int:id>/delete', methods=['POST'])
-def delete_feedback(id):
-    if 'user_id' not in session:
+    if form.validate_on_submit():
+        feedback.title = form.title.data
+        feedback.content = form.content.data
+
+        db.session.commit()
+
+        return redirect(f'users/{feedback.username}')
+
+    return render_template('feedback/edit.html', form=form, feedback=feedback)
+
+
+
+@app.route('/feedback/<int:feedback_id>/delete', methods=['POST'])
+def delete_feedback(feedback_id):
+    if 'username' not in session:
         flash("Please log in first!", "danger")
+        raise Unauthorized()
         return redirect('/login')
+
     feedback = Feedback.query.get_or_404(id)
-    if feedback.user_id == session['user_id']:
+
+    form = DeleteForm()
+
+    if form.validate_on_submit():
         db.session.delete(feedback)
         db.session.commit()
-        flash("Feedback deleted", "success")
-        return redirect('/feedback')
-    flash("You don't have permission to do that!")
-    return redirect('/feedback')
+
+    return redirect(f"/users/{feedback.username}")
 
 
 
