@@ -50,9 +50,9 @@ def register_user():
         db.session.commit()
         session['user_id'] = new_user.id
         flash('Welcome! Successfully created new account.')
-        return redirect('/users/<username>')
+        return redirect('/users/{user.username}')
 
-    return render_template('register.html', form=form)
+    return render_template('users/register.html', form=form)
 
 
 @app.route('/login', methods=['GET', 'POST'])
